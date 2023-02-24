@@ -1,3 +1,4 @@
+#![windows_subsystem = "windows"]
 #![forbid(unsafe_code)]
 #![warn(
     clippy::dbg_macro,
