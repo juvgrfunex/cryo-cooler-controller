@@ -1,0 +1,11 @@
+[workspace]
+resolver = "2"
+
+members = [
+    "cryo_cooler_controller",
+    "cryo_cooler_controller_lib"
+]
+
+[profile.release]
+lto = true
+codegen-units = 1
