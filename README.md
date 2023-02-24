@@ -4,6 +4,8 @@ Cryo Cooler Controller is a tool to control CPU coolers based on Intels Cryo Coo
 
 Unlike the official software the supported processors are not artificially restricted. It also offers extra configuration options such as a custom target temperature and manual PID values.
 
+[Download](https://github.com/juvgrfunex/cryo-cooler-controller/releases/tag/v1.0.0)
+
 ## Supported Coolers
 
 - [MasterLiquid ML360 SUB-ZERO](https://www.coolermaster.com/de/de-de/catalog/coolers/cpu-liquid-coolers/masterliquid-ml360-sub-zero/)
