@@ -16,12 +16,12 @@ plotters = { version = "0.3", default_features = false, features = [
 ] }
 chrono = { version = "0.4", default-features = false }
 plotters-backend = "0.3"
-iced = { version = "0.8", features = ["canvas", "tokio", "debug"] }
-iced_native = "0.9"
-iced_graphics = { version = "0.7", features = ["canvas"] }
-plotters-iced = "0.7.0"
+iced = { version = "0.10", features = ["canvas", "tokio"] }
+iced_runtime = "0.1"
+iced_graphics = { version = "0.9"}
+plotters-iced = "0.9.0"
 cryo_cooler_controller_lib = {path = "../cryo_cooler_controller_lib"}
-iced_aw = "0.4.0"
+iced_aw = "0.6.0"
 serial2 = "*"
 tray-icon = "0.4.2"
 

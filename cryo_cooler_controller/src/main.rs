@@ -14,7 +14,6 @@
     clippy::use_debug
 )]
 
-
 extern crate iced;
 extern crate plotters;
 
@@ -24,7 +23,7 @@ mod running;
 use iced::{
     alignment, executor,
     widget::{Column, Container, Row, Text},
-    Application, Color, Command, Element, Font, Length, Settings, Subscription, Theme,
+    Application, Color, Command, Element, Length, Settings, Size, Subscription, Theme,
 };
 
 use running::RunningState;
@@ -32,16 +31,6 @@ use std::time::Duration;
 use tray_icon::{
     menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem},
     TrayIconBuilder,
-};
-
-const FONT_REGULAR: Font = Font::External {
-    name: "sans-serif-regular",
-    bytes: include_bytes!("../fonts/notosans-regular.ttf"),
-};
-
-const FONT_BOLD: Font = Font::External {
-    name: "sans-serif-bold",
-    bytes: include_bytes!("../fonts/notosans-bold.ttf"),
 };
 
 const ICON: &[u8; 0x4000] = include_bytes!(concat!(env!("OUT_DIR"), "/icon.bin"));
@@ -74,13 +63,12 @@ fn main() {
 
     let _ = CryoCoolerController::run(Settings {
         antialiasing: true,
-        default_font: Some(include_bytes!("../fonts/notosans-regular.ttf")),
         window: iced::window::Settings {
             size: (550, 350),
             resizable: true,
             decorations: true,
             icon: Some(
-                iced::window::icon::Icon::from_rgba(ICON.to_vec(), 64, 64)
+                iced::window::icon::from_rgba(ICON.to_vec(), 64, 64)
                     .expect("icon.bin contains valid rgba"),
             ),
             ..iced::window::Settings::default()
@@ -105,6 +93,8 @@ pub enum Message {
     Open,
     ChangeState,
     Hide,
+    FontLoaded,
+    FontLoadingFailed
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -186,7 +176,7 @@ impl HomeState {
             )
             .push(Row::new().push(Text::new(format!("Version {}", env!("CARGO_PKG_VERSION")))));
 
-        let content = iced_aw::Modal::new(self.error_text.is_some(), content, || {
+        let content = iced_aw::Modal::new(self.error_text.is_some(), content,
             iced_aw::Card::new(
                 Text::new("Failed to connect to cooler"),
                 Text::new(self.error_text.clone().unwrap_or_else(|| "".to_owned())),
@@ -202,9 +192,8 @@ impl HomeState {
             )
             .max_width(300.0)
             .on_close(Message::CloseModal)
-            .into()
 
-        })
+        )
         .backdrop(Message::CloseModal)
         .on_esc(Message::CloseModal);
 
@@ -265,7 +254,10 @@ impl Application for CryoCoolerController {
             CryoCoolerController {
                 state: State::Home(HomeState::new()),
             },
-            Command::none(),
+            iced::font::load(iced_aw::graphics::icons::ICON_FONT_BYTES).map(|ret|  match ret{
+                Ok(_) => Message::FontLoaded,
+                Err(_) => Message::FontLoadingFailed,
+            }),
         )
     }
 
@@ -277,13 +269,13 @@ impl Application for CryoCoolerController {
         if let Ok(event) = MenuEvent::receiver().try_recv() {
             match event.id {
                 1000 => {
-                    return Command::single(iced_native::command::Action::Window(
-                        iced_native::window::Action::Close,
+                    return Command::single(iced_runtime::command::Action::Window(
+                        iced_runtime::window::Action::Close,
                     ));
                 }
                 1001 => {
-                    return Command::single(iced_native::command::Action::Window(
-                        iced_native::window::Action::ChangeMode(iced::window::Mode::Windowed),
+                    return Command::single(iced_runtime::command::Action::Window(
+                        iced_runtime::window::Action::ChangeMode(iced::window::Mode::Windowed),
                     ));
                 }
                 _ => {}
@@ -301,23 +293,26 @@ impl Application for CryoCoolerController {
                             Err(error) => {
                                 home.error_text =
                                     Some(format!("Error connecting to Port {port} ({error})"));
-                                return iced_native::Command::none();
+                                return iced_runtime::Command::none();
                             }
                         }
 
-                        return Command::single(iced_native::command::Action::Window(
-                            iced_native::window::Action::Resize {
-                                width: 1400,
-                                height: 1000,
-                            },
+                        return Command::single(iced_runtime::command::Action::Window(
+                            iced_runtime::window::Action::Resize(Size::new(1400, 1000)),
                         ));
                     }
                 }
             }
             Message::Hide => {
-                return Command::single(iced_native::command::Action::Window(
-                    iced_native::window::Action::ChangeMode(iced::window::Mode::Hidden),
+                return Command::single(iced_runtime::command::Action::Window(
+                    iced_runtime::window::Action::ChangeMode(iced::window::Mode::Hidden),
                 ));
+            }
+            Message::FontLoadingFailed => {
+                if let State::Home(ref mut home) = &mut self.state {
+                    home.error_text = Some("Failed to load some icon, the software will still function but some UI elemnts may be missing".to_owned());
+                    return iced_runtime::Command::none();
+                }
             }
             _ => {}
         }

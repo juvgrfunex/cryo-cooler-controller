@@ -16,7 +16,7 @@ use plotters::{
     style::{Color, IntoFont, RGBAColor, RGBColor, ShapeStyle},
 };
 use plotters_backend::{DrawingBackend, FontTransform};
-use plotters_iced::{Chart, ChartWidget};
+use plotters_iced::{Chart, ChartWidget, Renderer};
 
 use crate::Message;
 
@@ -187,14 +187,10 @@ impl MonitoringChartf32 {
 
     fn view(&self) -> Element<Message> {
         Container::new(
-            Column::new().width(Length::Fill).height(Length::Fill).push(
-                ChartWidget::new(self)
-                    .height(Length::Fill)
-                    .resolve_font(|_, style| match style {
-                        plotters_backend::FontStyle::Bold => crate::FONT_BOLD,
-                        _ => crate::FONT_REGULAR,
-                    }),
-            ),
+            Column::new()
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .push(ChartWidget::new(self).height(Length::Fill)),
         )
         .width(Length::Fill)
         .height(Length::Fill)
@@ -217,15 +213,15 @@ impl Chart<Message> for MonitoringChartf32 {
         state: &mut Self::State,
         event: iced::widget::canvas::Event,
         bounds: iced::Rectangle,
-        cursor: iced::widget::canvas::Cursor,
-    ) -> (iced_native::event::Status, Option<Message>) {
-        if let iced::widget::canvas::Event::Mouse(mouse_event) = event{
-            if mouse_event == iced_native::mouse::Event::CursorLeft{
+        cursor: iced::mouse::Cursor,
+    ) -> (iced::event::Status, Option<Message>) {
+        if let iced::widget::canvas::Event::Mouse(mouse_event) = event {
+            if mouse_event == iced::mouse::Event::CursorLeft {
                 state.mouse_x_position = None;
-                return (iced_native::event::Status::Ignored, None);
+                return (iced::event::Status::Ignored, None);
             }
         }
-        if let iced::widget::canvas::Cursor::Available(point) = cursor {
+        if let iced::mouse::Cursor::Available(point) = cursor {
             if point.x >= bounds.x && point.x <= bounds.x + bounds.width {
                 state.mouse_x_position = Some(point.x);
                 state.bounds = bounds;
@@ -233,25 +229,30 @@ impl Chart<Message> for MonitoringChartf32 {
                 state.mouse_x_position = None;
             }
         }
-        (iced_native::event::Status::Ignored, None)
+        (iced::event::Status::Ignored, None)
     }
 
     fn mouse_interaction(
         &self,
         state: &Self::State,
         _bounds: iced::Rectangle,
-        _cursor: iced::widget::canvas::Cursor,
-    ) -> iced_native::mouse::Interaction {
+        _cursor: iced::mouse::Cursor,
+    ) -> iced::mouse::Interaction {
         if state.mouse_x_position.is_some() {
-            iced_native::mouse::Interaction::Crosshair
+            iced::mouse::Interaction::Crosshair
         } else {
-            iced_native::mouse::Interaction::Idle
+            iced::mouse::Interaction::Idle
         }
     }
 
     #[inline]
-    fn draw<F: Fn(&mut Frame)>(&self, bounds: Size, draw_fn: F) -> Geometry {
-        self.cache.draw(bounds, draw_fn)
+    fn draw<R: Renderer, F: Fn(&mut Frame)>(
+        &self,
+        renderer: &R,
+        bounds: Size,
+        draw_fn: F,
+    ) -> Geometry {
+        renderer.draw_cache(&self.cache, bounds, draw_fn)
     }
 
     fn build_chart<DB: DrawingBackend>(&self, state: &Self::State, mut chart: ChartBuilder<DB>) {

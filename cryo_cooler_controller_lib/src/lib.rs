@@ -12,7 +12,6 @@
     clippy::use_debug
 )]
 
-
 use chrono::Utc;
 use serial::SerialPort;
 use std::{
@@ -38,15 +37,14 @@ impl Tec {
 
         let crc = CRC_16_XMODEM.checksum(&buffer[0..6]);
         let response = Response::from_bytes(buffer);
-        if response.crc == crc{
+        if response.crc == crc {
             Ok(response)
-        }else{
+        } else {
             Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 "Response contained incorrect crc",
             ))
         }
-       
     }
 
     fn reset(&mut self) -> Result<(), std::io::Error> {
@@ -334,7 +332,7 @@ mod commands {
         pub const I_COEFFICIENT: u8 = 0x16;
         pub const D_COEFFICIENT: u8 = 0x17;
         pub const DISABLE_NOT_ENABLE: u8 = 0x18;
-        pub const CPU_TEMP: u8 = 0x19;  // unclear how to use
+        pub const CPU_TEMP: u8 = 0x19; // unclear how to use
         pub const NTC_COEFFICIENT: u8 = 0x20;
         pub const TEMP_SENSOR: u8 = 0x1C;
         pub const TEC_POWER_LEVEL: u8 = 0x1D;

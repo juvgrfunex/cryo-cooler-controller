@@ -279,7 +279,9 @@ impl RunningState {
                     .width(Length::Fill),
             );
 
-        iced_aw::Modal::new(self.error_text.is_some(), content, || {
+        iced_aw::Modal::new(
+            self.error_text.is_some(),
+            content,
             iced_aw::Card::new(
                 Text::new("Error"),
                 Text::new(self.error_text.clone().unwrap_or_else(|| "".to_owned())),
@@ -294,9 +296,8 @@ impl RunningState {
                 ),
             )
             .max_width(300.0)
-            .on_close(Message::CloseModal)
-            .into()
-        })
+            .on_close(Message::CloseModal),
+        )
         .backdrop(Message::CloseModal)
         .on_esc(Message::CloseModal)
         .into()
@@ -380,6 +381,5 @@ pub fn view_badges(status: &TecStatus) -> Element<'_, Message> {
         )
     }
 
-   
     col.into()
 }
