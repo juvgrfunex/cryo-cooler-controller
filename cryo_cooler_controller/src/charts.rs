@@ -218,13 +218,14 @@ impl Chart<Message> for MonitoringChartf32 {
         if let iced::widget::canvas::Event::Mouse(mouse_event) = event {
             if mouse_event == iced::mouse::Event::CursorLeft {
                 state.mouse_x_position = None;
-                return (iced::event::Status::Ignored, None);
+                return (iced::event::Status::Captured, None);
             }
         }
         if let iced::mouse::Cursor::Available(point) = cursor {
             if point.x >= bounds.x && point.x <= bounds.x + bounds.width {
                 state.mouse_x_position = Some(point.x);
                 state.bounds = bounds;
+                self.cache.clear();
             } else {
                 state.mouse_x_position = None;
             }

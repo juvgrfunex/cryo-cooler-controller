@@ -330,7 +330,7 @@ impl Application for CryoCoolerController {
     }
 
     fn subscription(&self) -> Subscription<Self::Message> {
-        const FPS: u64 = 50;
+        const FPS: u64 = 100;
         iced::time::every(Duration::from_millis(1000 / FPS)).map(|_| Message::Tick)
     }
 }
