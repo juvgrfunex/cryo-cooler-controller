@@ -346,7 +346,7 @@ fn calc_hover_index(
         let translation_factor = (data_size as f32) / bounds_width;
         let mut hover_index =
             data_size.saturating_sub(((x_pos - bounds_x) * translation_factor).round() as usize);
-        if hover_index >= data_size {
+        if hover_index >= data_size && data_size >= 1{
             hover_index = data_size - 1;
         }
         return Some(hover_index);
