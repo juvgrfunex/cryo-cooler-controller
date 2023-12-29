@@ -33,7 +33,7 @@ You can bring it back by right clicking on the tray icon.
 
 ## FAQ
 
-Q:Can not connect to the cooler. Error connecting to Port (Access is denied.)
+Q: Can not connect to the cooler. Error connecting to Port (Access is denied.)
 
 A: If the official software is installed it will be talking to the cooler already and blocking access.
 It is not possible for both of them to work at the same time.
