@@ -85,7 +85,7 @@ impl Tec {
     pub fn hear_beat(&mut self) -> Result<TecStatus, std::io::Error> {
         let response = self.send_cmd(&Request::new(commands::HEART_BEAT, [0; 4]))?;
         let status_code = u32::from_le_bytes(response.data);
-        TecStatus::from_bits(status_code).ok_or_else(|| {
+        TecStatus::from_bits(status_code & 0b111111111111111111).ok_or_else(|| {
             std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 format!("Tecstatus bit pattern invalid: {status_code:b} "),

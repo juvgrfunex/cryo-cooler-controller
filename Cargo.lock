@@ -590,7 +590,7 @@ checksum = "7a81dae078cea95a014a339291cec439d2f232ebe854a9d672b796c6afafa9b7"
 
 [[package]]
 name = "cryo_cooler_controller"
-version = "1.0.0"
+version = "1.0.2"
 dependencies = [
  "chrono",
  "cryo_cooler_controller_lib",
@@ -608,7 +608,7 @@ dependencies = [
 
 [[package]]
 name = "cryo_cooler_controller_lib"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "bitflags 2.3.3",
  "chrono",
