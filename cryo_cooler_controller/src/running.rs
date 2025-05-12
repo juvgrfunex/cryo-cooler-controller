@@ -76,18 +76,24 @@ impl RunningState {
                     return Command::none();
                 }
 
+                match self.tec.hear_beat() {
+                    Ok(status) => self.tec_status = status,
+                    Err(err) => {
+                        if let Err(e) = self.tec.reset_connection() {
+                            self.error_text =
+                                Some(format!("Failed to communicate with coooler ({e:?})"));
+                            return Command::none();
+                        } else {
+                            self.error_text =
+                                Some(format!("Failed to communicate with coooler ({err:?})"))
+                        }
+                    }
+                }
                 self.last_sample_time = Instant::now();
                 match self.tec.monitor() {
                     Ok(data) => self.chart.update(data),
                     Err(err) => {
                         self.error_text = Some(format!("Failed to get data from coooler ({err})"));
-                    }
-                }
-                match self.tec.hear_beat() {
-                    Ok(status) => self.tec_status = status,
-                    Err(err) => {
-                        self.error_text =
-                            Some(format!("Failed to communicate with coooler ({err})"))
                     }
                 }
             }
@@ -121,6 +127,9 @@ impl RunningState {
             }
             Message::UpdateMaxPower(input) => {
                 self.inputs.max_power = input;
+            }
+            Message::CloseModal => {
+                self.error_text = None;
             }
             _ => {}
         }

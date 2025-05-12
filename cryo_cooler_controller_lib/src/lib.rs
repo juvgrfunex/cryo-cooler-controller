@@ -21,6 +21,7 @@ use std::{
 const CRC_16_XMODEM: crc::Crc<u16> = crc::Crc::<u16>::new(&crc::CRC_16_XMODEM);
 pub struct Tec {
     port: serial::SystemPort,
+    port_ident: std::ffi::OsString,
 }
 
 impl Tec {
@@ -47,7 +48,7 @@ impl Tec {
         }
     }
 
-    fn reset(&mut self) -> Result<(), std::io::Error> {
+    pub fn reset(&mut self) -> Result<(), std::io::Error> {
         self.send_cmd(&Request::new(commands::set::RESET_BOARD, [0; 4]))?;
         Ok(())
     }
@@ -61,18 +62,32 @@ impl Tec {
     }
 }
 
+fn open_serial_port<T: AsRef<std::ffi::OsStr>>(
+    serial_port: &T,
+) -> Result<serial::SystemPort, std::io::Error> {
+    let mut port = serial::open(serial_port)?;
+    port.reconfigure(&|settings| {
+        settings.set_baud_rate(serial::Baud115200)?;
+        settings.set_char_size(serial::Bits8);
+        settings.set_stop_bits(serial::Stop1);
+        settings.set_parity(serial::ParityNone);
+        settings.set_flow_control(serial::FlowNone);
+        Ok(())
+    })?;
+    Ok(port)
+}
 impl Tec {
+    pub fn reset_connection(&mut self) -> Result<(), std::io::Error> {
+        self.port = open_serial_port(&self.port_ident)?;
+        Ok(())
+    }
+
     pub fn new<T: AsRef<std::ffi::OsStr>>(serial_port: &T) -> Result<Self, std::io::Error> {
-        let mut port = serial::open(serial_port)?;
-        port.reconfigure(&|settings| {
-            settings.set_baud_rate(serial::Baud115200)?;
-            settings.set_char_size(serial::Bits8);
-            settings.set_stop_bits(serial::Stop1);
-            settings.set_parity(serial::ParityNone);
-            settings.set_flow_control(serial::FlowNone);
-            Ok(())
-        })?;
-        let mut tec = Tec { port };
+        let port = open_serial_port(serial_port)?;
+        let mut tec = Tec {
+            port,
+            port_ident: serial_port.into(),
+        };
 
         let status = tec.hear_beat()?;
         if !status.contains(TecStatus::BOARD_INIT) {

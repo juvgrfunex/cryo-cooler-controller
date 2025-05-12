@@ -342,14 +342,14 @@ fn calc_hover_index(
     bounds_width: f32,
     bounds_x: f32,
 ) -> Option<usize> {
-    if data_size == 0{
+    if data_size == 0 {
         return None;
     }
-    if let Some(x_pos) = x_pos_option{
+    if let Some(x_pos) = x_pos_option {
         let translation_factor = (data_size as f32) / bounds_width;
         let mut hover_index =
             data_size.saturating_sub(((x_pos - bounds_x) * translation_factor).round() as usize);
-        if hover_index >= data_size{
+        if hover_index >= data_size {
             hover_index = data_size - 1;
         }
         return Some(hover_index);

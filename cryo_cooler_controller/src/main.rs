@@ -94,7 +94,7 @@ pub enum Message {
     ChangeState,
     Hide,
     FontLoaded,
-    FontLoadingFailed
+    FontLoadingFailed,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -254,7 +254,7 @@ impl Application for CryoCoolerController {
             CryoCoolerController {
                 state: State::Home(HomeState::new()),
             },
-            iced::font::load(iced_aw::graphics::icons::ICON_FONT_BYTES).map(|ret|  match ret{
+            iced::font::load(iced_aw::graphics::icons::ICON_FONT_BYTES).map(|ret| match ret {
                 Ok(_) => Message::FontLoaded,
                 Err(_) => Message::FontLoadingFailed,
             }),
