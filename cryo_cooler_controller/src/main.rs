@@ -1,4 +1,4 @@
-#![windows_subsystem = "windows"]
+#![cfg_attr(not(test), windows_subsystem = "windows")]
 #![forbid(unsafe_code)]
 #![warn(
     clippy::dbg_macro,
@@ -13,12 +13,13 @@
     clippy::unwrap_used,
     clippy::use_debug
 )]
-
+//TODO bump versions
 extern crate iced;
 extern crate plotters;
 
 mod charts;
 mod running;
+mod settings;
 
 use iced::{
     alignment, executor,
@@ -36,6 +37,7 @@ use tray_icon::{
 const ICON: &[u8; 0x4000] = include_bytes!(concat!(env!("OUT_DIR"), "/icon.bin"));
 
 fn main() {
+    let settings = settings::AppSettings::new();
     let icon =
         tray_icon::icon::Icon::from_rgba(ICON.to_vec(), 64, 64).expect("Failed to open icon");
 
@@ -73,6 +75,7 @@ fn main() {
             ),
             ..iced::window::Settings::default()
         },
+        flags: settings,
         ..Settings::default()
     });
 }
@@ -88,6 +91,7 @@ pub enum Message {
     UpdateDCoef(f32),
     UpdateSetpoint(f32),
     UpdateMaxPower(u8),
+    ApplyStartupCheckboxToggled(bool),
 
     PortSelected(PortIdent),
     Open,
@@ -95,6 +99,7 @@ pub enum Message {
     Hide,
     FontLoaded,
     FontLoadingFailed,
+    OpenCheckboxToggled(bool),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -112,19 +117,25 @@ impl std::fmt::Display for PortIdent {
 struct HomeState {
     selected_port: Option<PortIdent>,
     error_text: Option<String>,
+    app_settings: settings::AppSettings,
 }
 
 impl HomeState {
-    pub fn new() -> Self {
+    pub fn new(app_settings: settings::AppSettings) -> Self {
         let mut ports: Vec<PortIdent> = serial2::SerialPort::available_ports()
             .unwrap_or_default()
             .into_iter()
             .map(|path| PortIdent { path })
             .collect();
+        let port = match app_settings.get_last_port_ident() {
+            Some(path) => Some(PortIdent { path: path.clone() }),
+            None => ports.pop(),
+        };
 
         Self {
-            selected_port: ports.pop(),
+            selected_port: port,
             error_text: None,
+            app_settings,
         }
     }
     pub fn update(&mut self, message: Message) -> Command<Message> {
@@ -134,6 +145,11 @@ impl HomeState {
             }
             Message::CloseModal => {
                 self.error_text = None;
+            }
+            Message::OpenCheckboxToggled(checked) => {
+                if let Err(e) = self.app_settings.set_open_port_on_startup(checked) {
+                    self.error_text = Some(format!("Failed to save settings ({e})"));
+                }
             }
             _ => {}
         }
@@ -174,7 +190,20 @@ impl HomeState {
                     .push(Column::new().push(pick_list))
                     .push(Column::new().push(open_btn)),
             )
-            .push(Row::new().push(Text::new(format!("Version {}", env!("CARGO_PKG_VERSION")))));
+            .push(iced::widget::vertical_space(Length::Fixed(15.0)))
+            .push(
+                Row::new()
+                    .spacing(80)
+                    .push(
+                        Row::new()
+                            .push(Text::new(format!("Version {}", env!("CARGO_PKG_VERSION")))),
+                    )
+                    .push(iced::widget::checkbox(
+                        "Connect on Startup",
+                        self.app_settings.get_open_port_on_startup(),
+                        Message::OpenCheckboxToggled,
+                    )),
+            );
 
         let content = iced_aw::Modal::new(self.error_text.is_some(), content,
             iced_aw::Card::new(
@@ -220,7 +249,7 @@ enum State {
 impl Application for CryoCoolerController {
     type Message = self::Message;
     type Executor = executor::Default;
-    type Flags = ();
+    type Flags = settings::AppSettings;
     type Theme = Theme;
 
     fn theme(&self) -> Self::Theme {
@@ -249,16 +278,40 @@ impl Application for CryoCoolerController {
         })
     }
 
-    fn new(_flags: Self::Flags) -> (Self, Command<Self::Message>) {
-        (
-            CryoCoolerController {
-                state: State::Home(HomeState::new()),
-            },
+    fn new(settings: Self::Flags) -> (Self, Command<Self::Message>) {
+        let mut commands = vec![
             iced::font::load(iced_aw::graphics::icons::ICON_FONT_BYTES).map(|ret| match ret {
                 Ok(_) => Message::FontLoaded,
                 Err(_) => Message::FontLoadingFailed,
             }),
-        )
+        ];
+
+        let state = {
+            if let (Some(p), true) = (
+                settings.get_last_port_ident(),
+                settings.get_open_port_on_startup(),
+            ) {
+                match RunningState::new(p, settings.clone()) {
+                    Ok(running_state) => {
+                        commands.push(Command::single(iced_runtime::command::Action::Window(
+                            iced_runtime::window::Action::Resize(Size::new(1400, 1000)),
+                        )));
+                        State::Running(running_state)
+                    }
+                    Err(error) => {
+                        let mut home = HomeState::new(settings.clone());
+                        home.error_text = Some(format!(
+                            "Error connecting to Port {} ({error})",
+                            PortIdent { path: p.clone() }
+                        ));
+                        State::Home(home)
+                    }
+                }
+            } else {
+                State::Home(HomeState::new(settings))
+            }
+        };
+        (CryoCoolerController { state }, Command::batch(commands))
     }
 
     fn title(&self) -> String {
@@ -284,9 +337,13 @@ impl Application for CryoCoolerController {
 
         match message {
             Message::Open => {
-                if let State::Home(ref mut home) = &mut self.state {
+                if let State::Home(ref mut home) = self.state {
                     if let Some(port) = &home.selected_port {
-                        match RunningState::new(&port.path) {
+                        let _ = home
+                            .app_settings
+                            .set_last_port_ident(Some(port.path.clone()));
+                        let cloned_settings = home.app_settings.clone();
+                        match RunningState::new(&port.path, cloned_settings) {
                             Ok(running_state) => {
                                 self.state = State::Running(running_state);
                             }

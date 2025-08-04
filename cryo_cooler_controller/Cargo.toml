@@ -24,7 +24,13 @@ cryo_cooler_controller_lib = {path = "../cryo_cooler_controller_lib"}
 iced_aw = "0.6.0"
 serial2 = "*"
 tray-icon = "0.4.2"
+dirs = "6.0.0"
+serde = "1.0.219"
+serde_json = "1.0.140"
 
 [build-dependencies]
 image = "0.24.5"
+
+[dev-dependencies]
+tempdir = "0.3"
 

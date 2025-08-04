@@ -10,16 +10,8 @@ use iced_aw::NumberInput;
 
 use cryo_cooler_controller_lib::TecStatus;
 
+use crate::settings;
 use crate::{charts::ChartGroup, Message};
-
-#[derive(Default, Debug)]
-struct Inputs {
-    p_coef: f32,
-    i_coef: f32,
-    d_coef: f32,
-    set_point: f32,
-    max_power: u8,
-}
 
 pub struct RunningState {
     last_sample_time: Instant,
@@ -29,13 +21,16 @@ pub struct RunningState {
     firmware_version_minor: u8,
     hardware_version: u32,
     chart: ChartGroup,
-    inputs: Inputs,
     error_text: Option<String>,
     update_intervall: Duration,
+    app_settings: settings::AppSettings,
 }
 
 impl RunningState {
-    pub fn new<T>(serial_port: &T) -> Result<Self, std::io::Error>
+    pub fn new<T>(
+        serial_port: &T,
+        app_settings: settings::AppSettings,
+    ) -> Result<Self, std::io::Error>
     where
         T: AsRef<std::path::Path> + std::fmt::Debug,
     {
@@ -44,7 +39,19 @@ impl RunningState {
         let firmware_version_major = fw_version.0;
         let firmware_version_minor = fw_version.1;
         let hardware_version = tec.hw_version()?;
-        let tec_status = tec.hear_beat()?;
+        let tec_status = tec.heart_beat()?;
+        let mut error_text = None;
+        if app_settings.get_enable_on_startup(){
+            if let Err(err) = tec.enable(
+                app_settings.get_p_coef(),
+                app_settings.get_i_coef(),
+                app_settings.get_d_coef(),
+                app_settings.get_max_power(),
+                app_settings.get_set_point(),
+            ) {
+                error_text = Some(format!("Failed to enable TEC ({err})"));
+            }
+        }
         Ok(RunningState {
             last_sample_time: Instant::now(),
             tec,
@@ -53,15 +60,9 @@ impl RunningState {
             firmware_version_minor,
             hardware_version,
             chart: Default::default(),
-            inputs: Inputs {
-                p_coef: 100.0,
-                i_coef: 1.0,
-                d_coef: 1.0,
-                set_point: 2.0,
-                max_power: 100,
-            },
-            error_text: None,
+            error_text,
             update_intervall: Duration::from_millis(500),
+            app_settings,
         })
     }
     #[inline]
@@ -76,7 +77,7 @@ impl RunningState {
                     return Command::none();
                 }
 
-                match self.tec.hear_beat() {
+                match self.tec.heart_beat() {
                     Ok(status) => self.tec_status = status,
                     Err(err) => {
                         if let Err(e) = self.tec.reset_connection() {
@@ -99,11 +100,11 @@ impl RunningState {
             }
             Message::Enable => {
                 if let Err(err) = self.tec.enable(
-                    self.inputs.p_coef,
-                    self.inputs.i_coef,
-                    self.inputs.d_coef,
-                    self.inputs.max_power,
-                    self.inputs.set_point,
+                    self.app_settings.get_p_coef(),
+                    self.app_settings.get_i_coef(),
+                    self.app_settings.get_d_coef(),
+                    self.app_settings.get_max_power(),
+                    self.app_settings.get_set_point(),
                 ) {
                     self.error_text = Some(format!("Failed to enable TEC ({err})"));
                 }
@@ -114,22 +115,37 @@ impl RunningState {
                 }
             }
             Message::UpdatePCoef(input) => {
-                self.inputs.p_coef = input;
+                if let Err(e) = self.app_settings.set_p_coef(input) {
+                    self.error_text = Some(format!("Failed to save settings ({e})"));
+                }
             }
             Message::UpdateICoef(input) => {
-                self.inputs.i_coef = input;
+                if let Err(e) = self.app_settings.set_i_coef(input) {
+                    self.error_text = Some(format!("Failed to save settings ({e})"));
+                }
             }
             Message::UpdateDCoef(input) => {
-                self.inputs.d_coef = input;
+                if let Err(e) = self.app_settings.set_d_coef(input) {
+                    self.error_text = Some(format!("Failed to save settings ({e})"));
+                }
             }
             Message::UpdateSetpoint(input) => {
-                self.inputs.set_point = input;
+                if let Err(e) = self.app_settings.set_set_point(input) {
+                    self.error_text = Some(format!("Failed to save settings ({e})"));
+                }
             }
             Message::UpdateMaxPower(input) => {
-                self.inputs.max_power = input;
+                if let Err(e) = self.app_settings.set_max_power(input) {
+                    self.error_text = Some(format!("Failed to save settings ({e})"));
+                }
             }
             Message::CloseModal => {
                 self.error_text = None;
+            }
+            Message::ApplyStartupCheckboxToggled(checked) => {
+                if let Err(e) = self.app_settings.set_enable_on_startup(checked) {
+                    self.error_text = Some(format!("Failed to save settings ({e})"));
+                }
             }
             _ => {}
         }
@@ -173,7 +189,8 @@ impl RunningState {
 
         let hide_button = button("Hide Window")
             .style(iced::theme::Button::Primary)
-            .on_press(Message::Hide);
+            .on_press(Message::Hide)
+            .width(Length::Fixed(150.0));
 
         let content = Column::new()
             .spacing(5)
@@ -209,10 +226,14 @@ impl RunningState {
                     .push(Text::new("Offset"))
                     .push(horizontal_space(Length::Fill))
                     .push(
-                        NumberInput::new(self.inputs.set_point, 50.0, Message::UpdateSetpoint)
-                            .style(iced_aw::style::NumberInputStyles::Default)
-                            .step(1.0)
-                            .min(-50.0),
+                        NumberInput::new(
+                            self.app_settings.get_set_point(),
+                            50.0,
+                            Message::UpdateSetpoint,
+                        )
+                        .style(iced_aw::style::NumberInputStyles::Default)
+                        .step(1.0)
+                        .min(-50.0),
                     )
                     .padding(5)
                     .spacing(5),
@@ -222,10 +243,14 @@ impl RunningState {
                     .push(Text::new("Max. Power"))
                     .push(horizontal_space(Length::Fill))
                     .push(
-                        NumberInput::new(self.inputs.max_power, 100, Message::UpdateMaxPower)
-                            .style(iced_aw::style::NumberInputStyles::Default)
-                            .step(1)
-                            .min(0),
+                        NumberInput::new(
+                            self.app_settings.get_max_power(),
+                            100,
+                            Message::UpdateMaxPower,
+                        )
+                        .style(iced_aw::style::NumberInputStyles::Default)
+                        .step(1)
+                        .min(0),
                     )
                     .padding(5)
                     .spacing(5),
@@ -243,10 +268,14 @@ impl RunningState {
                     .push(Text::new("P Coefficient"))
                     .push(horizontal_space(Length::Fill))
                     .push(
-                        NumberInput::new(self.inputs.p_coef, 1000.0, Message::UpdatePCoef)
-                            .style(iced_aw::style::NumberInputStyles::Default)
-                            .step(0.1)
-                            .min(-1000.0),
+                        NumberInput::new(
+                            self.app_settings.get_p_coef(),
+                            1000.0,
+                            Message::UpdatePCoef,
+                        )
+                        .style(iced_aw::style::NumberInputStyles::Default)
+                        .step(0.1)
+                        .min(-1000.0),
                     )
                     .padding(5)
                     .spacing(5),
@@ -256,10 +285,14 @@ impl RunningState {
                     .push(Text::new("I Coefficient"))
                     .push(horizontal_space(Length::Fill))
                     .push(
-                        NumberInput::new(self.inputs.i_coef, 1000.0, Message::UpdateICoef)
-                            .style(iced_aw::style::NumberInputStyles::Default)
-                            .step(0.1)
-                            .min(-1000.0),
+                        NumberInput::new(
+                            self.app_settings.get_i_coef(),
+                            1000.0,
+                            Message::UpdateICoef,
+                        )
+                        .style(iced_aw::style::NumberInputStyles::Default)
+                        .step(0.1)
+                        .min(-1000.0),
                     )
                     .padding(5)
                     .spacing(5),
@@ -269,10 +302,14 @@ impl RunningState {
                     .push(Text::new("D Coefficient"))
                     .push(horizontal_space(Length::Fill))
                     .push(
-                        NumberInput::new(self.inputs.d_coef, 1000.0, Message::UpdateDCoef)
-                            .style(iced_aw::style::NumberInputStyles::Default)
-                            .step(0.1)
-                            .min(-1000.0),
+                        NumberInput::new(
+                            self.app_settings.get_d_coef(),
+                            1000.0,
+                            Message::UpdateDCoef,
+                        )
+                        .style(iced_aw::style::NumberInputStyles::Default)
+                        .step(0.1)
+                        .min(-1000.0),
                     )
                     .padding(5)
                     .spacing(5),
@@ -280,10 +317,17 @@ impl RunningState {
             .push(horizontal_rule(20))
             .push(view_badges(&self.tec_status))
             .push(vertical_space(Length::Fill))
+            .push(horizontal_rule(20))
             .push(
                 Column::new()
+                    .push(iced::widget::checkbox(
+                        "Enable TEC on Startup",
+                        self.app_settings.get_enable_on_startup(),
+                        Message::ApplyStartupCheckboxToggled,
+                    ))
                     .push(hide_button)
                     .padding(15)
+                    .spacing(15)
                     .align_items(Alignment::Center)
                     .width(Length::Fill),
             );

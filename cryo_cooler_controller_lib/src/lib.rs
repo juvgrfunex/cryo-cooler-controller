@@ -89,7 +89,7 @@ impl Tec {
             port_ident: serial_port.into(),
         };
 
-        let status = tec.hear_beat()?;
+        let status = tec.heart_beat()?;
         if !status.contains(TecStatus::BOARD_INIT) {
             tec.reset()?;
         }
@@ -97,7 +97,7 @@ impl Tec {
         Ok(tec)
     }
 
-    pub fn hear_beat(&mut self) -> Result<TecStatus, std::io::Error> {
+    pub fn heart_beat(&mut self) -> Result<TecStatus, std::io::Error> {
         let response = self.send_cmd(&Request::new(commands::HEART_BEAT, [0; 4]))?;
         let status_code = u32::from_le_bytes(response.data);
         TecStatus::from_bits(status_code & 0b111111111111111111).ok_or_else(|| {
@@ -367,10 +367,11 @@ pub struct MonitoringData {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, unused)]
 mod tests {
 
     use super::*;
-    const PORT_NAME: &str = "/dev/ttyUSB0";
+    const PORT_NAME: &str = "COM3";
 
     #[test]
     fn open() {
@@ -380,7 +381,7 @@ mod tests {
     #[test]
     fn heart_beat() {
         let mut tec = Tec::new(&PORT_NAME).unwrap();
-        let beat = tec.hear_beat();
+        let beat = tec.heart_beat();
     }
 
     #[test]
